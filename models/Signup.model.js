@@ -1,4 +1,4 @@
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 const mongo=mongoose
 
 const signupSchema=new mongo.Schema({
