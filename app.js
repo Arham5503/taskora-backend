@@ -1,17 +1,27 @@
-import express from "express"
+import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import router from "./routes/authRoutes.js";
 
+const app = express();
 
-const app=express()
+const allowPaths = [
+  "https://taskora-chi.vercel.app",
+  "http://localhost:5173",
+];
 
+// MIDDLEWARES
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-// Middleware
-app.use(express.urlencoded({extended:false}))
-app.use(cors(
-    {  origin: "http://localhost:5173",}
-))
+app.use(cors({
+  origin: allowPaths,
+  credentials: true
+}));
 
-// Routes
-app.use("/api/",router)
-export default app
+app.use(cookieParser());
+
+// ROUTES
+app.use("/api", router);
+
+export default app;
