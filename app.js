@@ -8,6 +8,7 @@ const app = express();
 const allowPaths = [
   "https://taskora-chi.vercel.app",
   "http://localhost:5173",
+  "http://localhost:3000"
 ];
 
 // MIDDLEWARES
