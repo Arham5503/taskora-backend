@@ -57,17 +57,24 @@ export const signin = async (req, res) => {
     const accessToken = createAccessToken(user);
     const refreshToken = createRefreshToken(user);
 
-    // ---- SET REFRESH TOKEN COOKIE ----
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true, // in production
-      sameSite: "None",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+const isProd = process.env.NODE_ENV === "production";
+
+res.cookie("accessToken", accessToken, {
+  httpOnly: true,       // ✅ required for security
+  secure: isProd,       // ❌ must be false on localhost (no HTTPS)
+  sameSite: isProd ? "None" : "Lax", // ❌ must be "Lax" for localhost
+  maxAge: 15 * 60 * 1000,
+});
+
+res.cookie("refreshToken", refreshToken, {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "None" : "Lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+});
 
     return res.status(200).json({
       message: "Login successful",
-      accessToken,
       user: {
         id: user._id,
         username: user.username,
@@ -84,23 +91,56 @@ export const signin = async (req, res) => {
 
 // Refresh Token
 
-export const refresh=(req,res)=>{
-  (req, res) => {
+export const refresh = (req, res) => {
   const token = req.cookies.refreshToken;
 
   if (!token)
     return res.status(401).json({ message: "No refresh token" });
 
-  jwt.verify(token, process.env.JWT_REFRESH_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: "Invalid refresh token" });
+  jwt.verify(token, process.env.JWT_REFRESH_SECRET, (err, decoded) => {
+    if (err)
+      return res.status(403).json({ message: "Invalid refresh token" });
 
     const accessToken = jwt.sign(
-      { id: user.id },
+      { email: decoded.email },
       process.env.JWT_ACCESS_SECRET,
       { expiresIn: "15m" }
     );
 
-    return res.json({ accessToken });
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    return res.json({ message: "Access token refreshed" });
   });
+};
+
+
+//Cookies Verify
+
+export const me=(req,res)=>{
+  const token=req.cookies?.accessToken
+  if(!token)
+  {
+    return res.status(401).json({user:null,message:"Session Out"})
+  }
+  jwt.verify(token,process.env.JWT_ACCESS_SECRET,(err,decoded)=>{
+    if(err){
+
+      return res.status(401).json({user:err},{message:"User Session Out!!"})
+    }
+    return res.json({user:decoded
+    },{message:"Verified"})
+  })
+
 }
-}
+
+// Logout
+export const logout = (req, res) => {
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
+  res.json({ message: "Logged out" });
+};
