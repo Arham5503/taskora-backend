@@ -2,8 +2,8 @@ import ProjectModel from "../models/Project.model.js";
 
 // Create New Project
 export const createProject=async (req,res)=>{
-    const { title,priority,durationDays}= req.body
-    if (!title || !priority || !durationDays) {
+    const { title,priority,durationDays,description}= req.body
+    if (!title || !priority || !durationDays ||!description) {
   return res.status(400).json({
     message: "All fields are required",
      title,priority,durationDays
@@ -13,6 +13,7 @@ export const createProject=async (req,res)=>{
     
     try { 
     const record= new ProjectModel({  title,
+      description,
       priority,
       durationDays,}) 
     await record.save()

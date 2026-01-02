@@ -8,10 +8,11 @@ const projectSchema = new mongoose.Schema(
       maxlength: 150,
     },
 
-    // description: {
-    //   type: String,
-    //   trim: true,
-    // },
+    description: {
+      type: String,
+      trim: true,
+      maxlength:50,
+    },
 
     // client: {
     //   name: {
