@@ -82,6 +82,19 @@ const projectSchema = new mongoose.Schema(
       max: 100,
       default: 0,
     },
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Signup",
+      required: true,
+    },
+
+team: [
+  {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Signup",
+  },
+],
+
   },
   {
     timestamps: true,

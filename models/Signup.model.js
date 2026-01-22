@@ -9,6 +9,10 @@ const signupSchema=new mongo.Schema({
           unique: true,
           trim: true
              },
+        title:{
+         type:String,
+        maxLength:120
+             },
         email:{
             type:String,
             required:true,
@@ -20,10 +24,10 @@ const signupSchema=new mongo.Schema({
             required:true,
             minLength:8
         },
-        // profile:{
-        //     type:String,
-        //     default:""
-        // },
+        profile:{
+            type:String,
+            default:""
+        },
          createdAt: {
     type: Date,
     default: Date.now

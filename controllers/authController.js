@@ -121,22 +121,27 @@ export const refresh = (req, res) => {
 
 //Cookies Verify
 
-export const me=(req,res)=>{
-  const token=req.cookies?.accessToken
-  if(!token)
-  {
-    return res.status(401).json({user:null,message:"Session Out"})
+export const me = async (req, res) => {
+  const token = req.cookies?.accessToken;
+
+  if (!token) {
+    return res.status(401).json({ user: null, message: "Session Out" });
   }
-  jwt.verify(token,process.env.JWT_ACCESS_SECRET,(err,decoded)=>{
-    if(err){
 
-      return res.status(401).json({user:err},{message:"User Session Out!!"})
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+
+    const user = await Signup.findOne({ email: decoded.email }).select("-password"); 
+
+    if (!user) {
+      return res.status(404).json({ user: null, message: "User not found" });
     }
-    return res.json({user:decoded
-    },{message:"Verified"})
-  })
 
-}
+    return res.status(200).json({ user, message: "Verified" });
+  } catch (err) {
+    return res.status(401).json({ user: null, message: "User Session Out!!" });
+  }
+};
 
 // Logout
 export const logout = (req, res) => {
@@ -144,3 +149,26 @@ export const logout = (req, res) => {
   res.clearCookie("refreshToken");
   res.json({ message: "Logged out" });
 };
+
+
+//Profile Get
+
+export const updateProfile =async (req,res)=>{
+  const token=req.cookies?.accessToken
+  const { username, title, profile }=req.body
+  if(!token){
+    return res.status(401).json("Session Out")
+  }
+  try {
+    const decoded=jwt.verify(token,process.env.JWT_ACCESS_SECRET)
+    const updatedFields = { username, title, profile };
+    
+    const updatedUser = await Signup.updateOne(
+      { email: decoded.email },
+      { $set: updatedFields }
+    );
+   return res.status(201).json({message:"Updated Successfully!!!"})
+  } catch (error) {
+    
+  }
+}
