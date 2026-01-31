@@ -14,11 +14,10 @@ const projectSchema = new mongoose.Schema(
       maxlength:50,
     },
 
-    // client: {
-    //   name: {
-    //     type: String,
-    //     trim: true,
-    //   },
+    client: {
+        type: String,
+        trim: true,
+      },
     //   logo: {
     //     type: String, 
     //   },
@@ -45,8 +44,13 @@ const projectSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["planning", "in_progress", "completed"],
+      enum: ["planning", "in_progress", "completed", "on_hold", "archived"],
       default: "planning",
+    },
+
+    isStarred: {
+      type: Boolean,
+      default: false,
     },
 
     priority: {
@@ -108,6 +112,11 @@ projectSchema.pre("save", async function () {
     );
   } else {
     this.progress = 0;
+  }
+
+  // Don't auto-update status if it's on_hold or archived
+  if (this.status === "on_hold" || this.status === "archived") {
+    return;
   }
 
   if (this.totalTasks === 0) {
