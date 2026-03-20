@@ -35,7 +35,7 @@ export const createProject = async (req, res) => {
     await record.save();
     return res.status(200).json({ message: "Project Created Successfully", project: record });
   } catch (error) {
-    return res.status(500).json({ message: "Server Error" + error });
+    return res.status(500).json({ message: "Server Error" ,error: error.message });
   }
 };
 
@@ -60,7 +60,7 @@ export const fetchProject = async (req, res) => {
     return res.status(200).json(record);
   } catch (error) {
     console.log("Server Error",error);
-    res.status(500).json({ message: "Server Error!",error });
+    res.status(500).json({ message: "Server Error!",error: error.message });
     return;
   }
 };
@@ -98,8 +98,8 @@ export const getProjectById = async (req, res) => {
 
     return res.status(200).json(project);
   } catch (error) {
-    console.error("Get project error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    console.error("Get project error:");
+    return res.status(500).json({ message: "Server Error",error: error.message });
   }
 };
 
@@ -152,7 +152,7 @@ export const updateProject = async (req, res) => {
     });
   } catch (error) {
     console.error("Update project error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error",error: error.message });
   }
 };
 
@@ -194,7 +194,7 @@ export const updateProjectStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Update status error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error" ,error: error.message});
   }
 };
 
@@ -230,7 +230,7 @@ export const deleteProject = async (req, res) => {
     return res.status(200).json({ message: "Project deleted successfully" });
   } catch (error) {
     console.error("Delete project error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error" ,error: error.message});
   }
 };
 
@@ -283,7 +283,7 @@ export const generateInviteLink = async (req, res) => {
     });
   } catch (error) {
     console.error("Generate invite error:", error);
-    return res.status(500).json({ message: "Server Error" });
+  return res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -341,7 +341,7 @@ export const joinViaInvite = async (req, res) => {
     });
   } catch (error) {
     console.error("Join via invite error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error",error: error.message });
   }
 };
 
@@ -370,7 +370,7 @@ export const getInviteInfo = async (req, res) => {
     });
   } catch (error) {
     console.error("Get invite info error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error",error: error.message });
   }
 };
 
@@ -412,7 +412,7 @@ export const getProjectTeam = async (req, res) => {
     });
   } catch (error) {
     console.error("Get team error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error" ,error: error.message});
   }
 };
 
@@ -454,6 +454,6 @@ export const removeTeamMember = async (req, res) => {
     return res.status(200).json({ message: "Team member removed" });
   } catch (error) {
     console.error("Remove member error:", error);
-    return res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error",error: error.message });
   }
 };

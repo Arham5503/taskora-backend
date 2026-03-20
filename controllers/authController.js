@@ -32,7 +32,7 @@ export const signup=async(req,res)=>{
 
     } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error",error: error.message });
   }
 }
 
@@ -60,9 +60,9 @@ export const signin = async (req, res) => {
 const isProd = process.env.NODE_ENV === "production";
 
 res.cookie("accessToken", accessToken, {
-  httpOnly: true,       // ✅ required for security
-  secure: isProd,       // ❌ must be false on localhost (no HTTPS)
-  sameSite: isProd ? "None" : "Lax", // ❌ must be "Lax" for localhost
+  httpOnly: true,       
+  secure: isProd,       
+  sameSite: isProd ? "None" : "Lax", 
   maxAge: 15 * 60 * 1000,
 });
 
@@ -84,7 +84,7 @@ res.cookie("refreshToken", refreshToken, {
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error",error: error.message });
   }
 };
 
@@ -139,7 +139,7 @@ export const me = async (req, res) => {
 
     return res.status(200).json({ user, message: "Verified" });
   } catch (err) {
-    return res.status(401).json({ user: null, message: "User Session Out!!" });
+    return res.status(401).json({ user: null, message: "User Session Out!!",error: error.message });
   }
 };
 
@@ -167,8 +167,9 @@ export const updateProfile =async (req,res)=>{
       { email: decoded.email },
       { $set: updatedFields }
     );
-   return res.status(201).json({message:"Updated Successfully!!!"})
+    return res.status(201).json({message:"Updated Successfully!!!"})
   } catch (error) {
     
+    return res.status(500).json({ message: "Enternal Server Error",error: error.message });
   }
 }

@@ -34,12 +34,12 @@ const taskSchema = new mongoose.Schema(
     assignees: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "SignUp",
+        ref: "Signup",
       },
     ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SignUp",
+      ref: "Signup",
       required: true,
     },
     category: {
@@ -71,42 +71,38 @@ const taskSchema = new mongoose.Schema(
   }
 );
 
-// After saving a task, update the project's task counts
-taskSchema.post("save", async function () {
+async function updateProjectCounts(projectId) {
   const Project = mongoose.model("Project");
   const Task = mongoose.model("Task");
 
-  const projectId = this.project;
   const totalTasks = await Task.countDocuments({ project: projectId });
   const completedTasks = await Task.countDocuments({
     project: projectId,
     status: "done",
   });
 
-  await Project.findByIdAndUpdate(projectId, {
-    totalTasks,
-    completedTasks,
-  });
+  const progress =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  console.log("Updating project:", projectId, { totalTasks, completedTasks, progress });
+
+  const updated = await Project.findByIdAndUpdate(
+    projectId,
+    { $set: { totalTasks, completedTasks, progress } },
+    { new: true, runValidators: true }
+  );
+
+  console.log("Project after update:", updated.totalTasks, updated.completedTasks, updated.progress);
+}
+
+// After creating or updating a task
+taskSchema.post("save", async function () {
+  await updateProjectCounts(this.project);
 });
 
-// After deleting a task, update the project's task counts
-taskSchema.post("findOneAndDelete", async function (doc) {
-  if (doc) {
-    const Project = mongoose.model("Project");
-    const Task = mongoose.model("Task");
-
-    const projectId = doc.project;
-    const totalTasks = await Task.countDocuments({ project: projectId });
-    const completedTasks = await Task.countDocuments({
-      project: projectId,
-      status: "done",
-    });
-
-    await Project.findByIdAndUpdate(projectId, {
-      totalTasks,
-      completedTasks,
-    });
-  }
+// After deleting via task.deleteOne()
+taskSchema.post("deleteOne", { document: true }, async function () {
+  await updateProjectCounts(this.project);
 });
 
 export default mongoose.model("Task", taskSchema);

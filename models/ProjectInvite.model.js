@@ -12,10 +12,11 @@ const projectInviteSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      default: () => crypto.randomBytes(16).toString("hex"),
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SignUp",
+      ref: "Signup",
       required: true,
     },
     role: {
@@ -25,11 +26,11 @@ const projectInviteSchema = new mongoose.Schema(
     },
     expiresAt: {
       type: Date,
-      default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
     maxUses: {
       type: Number,
-      default: 0, // 0 means unlimited
+      default: 0,
     },
     usedCount: {
       type: Number,
@@ -44,14 +45,6 @@ const projectInviteSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-// Generate unique invite code before saving
-projectInviteSchema.pre("save", function (next) {
-  if (!this.inviteCode) {
-    this.inviteCode = crypto.randomBytes(16).toString("hex");
-  }
-  next();
-});
 
 // Check if invite is valid
 projectInviteSchema.methods.isValid = function () {

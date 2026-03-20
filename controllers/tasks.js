@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import Task from "../models/Task.model.js";
 import Project from "../models/Project.model.js";
+import Signup from "../models/Signup.model.js";
 
 // Create a new task
 export const createTask = async (req, res) => {
@@ -17,7 +18,8 @@ export const createTask = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     // Check if project exists and user has access
     const projectDoc = await Project.findById(project);
@@ -26,9 +28,9 @@ export const createTask = async (req, res) => {
     }
 
     // Check if user is owner or team member
-    const isOwner = projectDoc.owner.toString() === userId;
+    const isOwner = projectDoc.owner.toString() === userId.toString();
     const isTeamMember = projectDoc.team.some(
-      (member) => member.toString() === userId
+      (member) => member.toString() === userId.toString()
     );
 
     if (!isOwner && !isTeamMember) {
@@ -57,7 +59,7 @@ export const createTask = async (req, res) => {
     });
   } catch (error) {
     console.error("Create task error:", error);
-    return res.status(500).json({ message: "Failed to create task" });
+    return res.status(500).json({ message: "Failed to create task", error: error.message });
   }
 };
 
@@ -72,7 +74,8 @@ export const getTasksByProject = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     // Check if project exists and user has access
     const project = await Project.findById(projectId);
@@ -80,9 +83,9 @@ export const getTasksByProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    const isOwner = project.owner.toString() === userId;
+    const isOwner = project.owner.toString() === userId.toString();
     const isTeamMember = project.team.some(
-      (member) => member.toString() === userId
+      (member) => member.toString() === userId.toString()
     );
 
     if (!isOwner && !isTeamMember) {
@@ -97,7 +100,7 @@ export const getTasksByProject = async (req, res) => {
     return res.status(200).json(tasks);
   } catch (error) {
     console.error("Get tasks error:", error);
-    return res.status(500).json({ message: "Failed to fetch tasks" });
+    return res.status(500).json({ message: "Failed to fetch tasks", error: error.message });
   }
 };
 
@@ -110,7 +113,8 @@ export const getMyTasks = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     // Get all projects where user is owner or team member
     const projects = await Project.find({
@@ -128,7 +132,7 @@ export const getMyTasks = async (req, res) => {
     return res.status(200).json(tasks);
   } catch (error) {
     console.error("Get my tasks error:", error);
-    return res.status(500).json({ message: "Failed to fetch tasks" });
+    return res.status(500).json({ message: "Failed to fetch tasks", error: error.message });
   }
 };
 
@@ -143,7 +147,8 @@ export const getTaskById = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     const task = await Task.findById(taskId)
       .populate("assignees", "username email profile")
@@ -156,9 +161,9 @@ export const getTaskById = async (req, res) => {
 
     // Check access
     const project = task.project;
-    const isOwner = project.owner.toString() === userId;
+    const isOwner = project.owner.toString() === userId.toString();
     const isTeamMember = project.team.some(
-      (member) => member.toString() === userId
+      (member) => member.toString() === userId.toString()
     );
 
     if (!isOwner && !isTeamMember) {
@@ -168,7 +173,7 @@ export const getTaskById = async (req, res) => {
     return res.status(200).json(task);
   } catch (error) {
     console.error("Get task error:", error);
-    return res.status(500).json({ message: "Failed to fetch task" });
+    return res.status(500).json({ message: "Failed to fetch task", error: error.message });
   }
 };
 
@@ -184,7 +189,8 @@ export const updateTask = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     const task = await Task.findById(taskId).populate("project", "owner team");
 
@@ -194,9 +200,9 @@ export const updateTask = async (req, res) => {
 
     // Check access
     const project = task.project;
-    const isOwner = project.owner.toString() === userId;
+    const isOwner = project.owner.toString() === userId.toString();
     const isTeamMember = project.team.some(
-      (member) => member.toString() === userId
+      (member) => member.toString() === userId.toString()
     );
 
     if (!isOwner && !isTeamMember) {
@@ -234,7 +240,7 @@ export const updateTask = async (req, res) => {
     });
   } catch (error) {
     console.error("Update task error:", error);
-    return res.status(500).json({ message: "Failed to update task" });
+    return res.status(500).json({ message: "Failed to update task", error: error.message });
   }
 };
 
@@ -249,7 +255,8 @@ export const deleteTask = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     const task = await Task.findById(taskId).populate("project", "owner team");
 
@@ -259,8 +266,8 @@ export const deleteTask = async (req, res) => {
 
     // Check access - only owner or task creator can delete
     const project = task.project;
-    const isOwner = project.owner.toString() === userId;
-    const isCreator = task.createdBy.toString() === userId;
+    const isOwner = project.owner.toString() === userId.toString();
+    const isCreator = task.createdBy.toString() === userId.toString();
 
     if (!isOwner && !isCreator) {
       return res.status(403).json({ message: "You don't have permission to delete this task" });
@@ -271,7 +278,7 @@ export const deleteTask = async (req, res) => {
     return res.status(200).json({ message: "Task deleted successfully" });
   } catch (error) {
     console.error("Delete task error:", error);
-    return res.status(500).json({ message: "Failed to delete task" });
+    return res.status(500).json({ message: "Failed to delete task", error: error.message });
   }
 };
 
@@ -291,7 +298,8 @@ export const updateTaskStatus = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const userId = decoded.id;
+    const user = await Signup.findOne({ email: decoded.email });
+    const userId = user._id;
 
     const task = await Task.findById(taskId).populate("project", "owner team");
 
@@ -301,9 +309,9 @@ export const updateTaskStatus = async (req, res) => {
 
     // Check access
     const project = task.project;
-    const isOwner = project.owner.toString() === userId;
+    const isOwner = project.owner.toString() === userId.toString();
     const isTeamMember = project.team.some(
-      (member) => member.toString() === userId
+      (member) => member.toString() === userId.toString()
     );
 
     if (!isOwner && !isTeamMember) {
@@ -319,6 +327,6 @@ export const updateTaskStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Update task status error:", error);
-    return res.status(500).json({ message: "Failed to update task status" });
+    return res.status(500).json({ message: "Failed to update task status", error: error.message });
   }
 };
