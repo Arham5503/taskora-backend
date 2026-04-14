@@ -28,11 +28,15 @@ const signupSchema=new mongo.Schema({
             type:String,
             default:""
         },
+        is_verified:{
+            type: Boolean,
+            default: false
+        },
          createdAt: {
     type: Date,
     default: Date.now
   }
 })
 
-const Signup = mongoose.model("SignUp", signupSchema);
+const Signup = mongoose.model("Signup", signupSchema);
 export default Signup
