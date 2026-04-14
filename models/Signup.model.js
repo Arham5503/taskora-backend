@@ -28,6 +28,10 @@ const signupSchema=new mongo.Schema({
             type:String,
             default:""
         },
+        is_verified:{
+            type: Boolean,
+            default: false
+        },
          createdAt: {
     type: Date,
     default: Date.now

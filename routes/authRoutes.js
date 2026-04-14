@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { signup, signin, refresh, me, logout, updateProfile } from "../controllers/authController.js";
+import { signup, signin, refresh, me, logout, updateProfile, resendOTP, verifyOTP } from "../controllers/authController.js";
 import { creatBlog, fetchBlog } from "../controllers/blog.js";
 import {
   createProject,
@@ -13,6 +13,7 @@ import {
   getInviteInfo,
   getProjectTeam,
   removeTeamMember,
+  fetchTeam,
 } from "../controllers/project.js";
 import {
   createTask,
@@ -34,6 +35,8 @@ router.get("/profile", me);
 router.post("/profile", updateProfile);
 router.get("/me", me);
 router.get("/logout", logout);
+router.post("/resend-otp",resendOTP)
+router.post("/verify-otp",verifyOTP)
 
 // Blog Routes
 router.post("/create-blog", creatBlog);
@@ -46,7 +49,7 @@ router.get("/project/:projectId", getProjectById);
 router.put("/project/:projectId", updateProject);
 router.patch("/project/:projectId/status", updateProjectStatus);
 router.delete("/project/:projectId", deleteProject);
-
+router.get("/users", fetchTeam)
 // Project Team Routes
 router.get("/project/:projectId/team", getProjectTeam);
 router.delete("/project/:projectId/team/:memberId", removeTeamMember);

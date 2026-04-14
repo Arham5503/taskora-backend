@@ -39,6 +39,15 @@ export const createProject = async (req, res) => {
   }
 };
 
+export const fetchTeam =async (req, res) => {
+  try {
+    const users = await Signup.find({}, "-password");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+};
+
 // Fetch All Projects
 export const fetchProject = async (req, res) => {
   const token = req.cookies?.accessToken;
