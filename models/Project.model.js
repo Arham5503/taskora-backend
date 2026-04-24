@@ -11,7 +11,7 @@ const projectSchema = new mongoose.Schema(
     description: {
       type: String,
       trim: true,
-      maxlength: 50,
+      maxlength: 2000,
     },
 
     client: {
@@ -71,10 +71,11 @@ const projectSchema = new mongoose.Schema(
     },
 
     team: [
-      {
+      {user:{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Signup",
       },
+      role: { type: String, enum: ["owner","manager","contributor","viewer" ], default: "viewer" }}
     ],
   },
   {

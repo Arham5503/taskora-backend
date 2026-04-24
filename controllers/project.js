@@ -2,6 +2,7 @@ import ProjectModel from "../models/Project.model.js";
 import ProjectInvite from "../models/ProjectInvite.model.js";
 import Signup from "../models/Signup.model.js";
 import jwt from "jsonwebtoken";
+import Connection from "../models/UserProjectConnection.model.js"
 
 // Create New Project
 export const createProject = async (req, res) => {
@@ -9,7 +10,7 @@ export const createProject = async (req, res) => {
   if (!token) {
     return res.status(401).json("Session Out");
   }
-  const { title, priority, durationDays, description, client } = req.body;
+  const { title, priority, durationDays, description, client,team } = req.body;
   if (!title || !priority || !durationDays || !description) {
     return res.status(400).json({
       message: "All fields are required",
@@ -23,6 +24,10 @@ export const createProject = async (req, res) => {
   const user = await Signup.findOne({ email: decoded.email });
 
   try {
+    const projectTeam=team.map((member)=>({
+      user: member._id,
+      role: member.permission 
+    }))
     const record = new ProjectModel({
       title,
       description,
@@ -30,21 +35,55 @@ export const createProject = async (req, res) => {
       durationDays,
       client,
       owner: user._id,
-      team: [user._id],
+      team: projectTeam,
     });
     await record.save();
+   const connectionPromises = team.map(member => {
+      const participants = [user._id, member._id].sort(); 
+      return Connection.findOneAndUpdate(
+        { participants },
+        { 
+          $set: { lastCollaboratedAt: new Date() },
+          $inc: { commonProjectsCount: 1 } 
+        },
+        { upsert: true }
+      );
+    });
+    await Promise.all(connectionPromises);
     return res.status(200).json({ message: "Project Created Successfully", project: record });
   } catch (error) {
     return res.status(500).json({ message: "Server Error" ,error: error.message });
   }
 };
 
-export const fetchTeam =async (req, res) => {
+
+
+export const fetchTeam = async (req, res) => {
+  const token = req.cookies?.accessToken;
+  if (!token) return res.status(401).json("Session Out");
+
   try {
-    const users = await Signup.find({}, "-password");
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch users" });
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const user = await Signup.findOne({ email: decoded.email });
+
+    // Find all connections where the current user is a participant
+    const connections = await Connection.find({
+      participants: user._id,
+    })
+      .populate("participants", "username title profile email") // Get user details
+      .sort({ lastCollaboratedAt: -1 });
+
+    // Filter out the current user from each connection to get the "other" person
+    const suggestedUsers = connections.map((conn) => {
+      const otherUser = conn.participants.find(
+        (p) => p._id.toString() !== user._id.toString()
+      );
+      return otherUser;
+    });
+
+    return res.status(200).json(suggestedUsers);
+  } catch (error) {
+    return res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -58,8 +97,8 @@ export const fetchProject = async (req, res) => {
   const user = await Signup.findOne({ email: decoded.email });
   try {
     const record = await ProjectModel.find({
-      $or: [{ owner: user._id }, { team: user._id }],
-    }).populate("team", "username email profile");
+      $or: [{ owner: user._id }, { "team.user": user._id }],
+    }).populate("team.user", "username email profile");
 
     if (!record || record.length < 1) {
       console.log("No Projects Data Found!");
@@ -89,7 +128,7 @@ export const getProjectById = async (req, res) => {
 
     const project = await ProjectModel.findById(projectId)
       .populate("owner", "username email profile")
-      .populate("team", "username email profile");
+      .populate("team.user", "username email profile");
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
@@ -272,7 +311,7 @@ export const generateInviteLink = async (req, res) => {
     const invite = new ProjectInvite({
       project: projectId,
       createdBy: user._id,
-      role: role || "editor",
+      role: role || "viewer",
       expiresAt: expiresInDays
         ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -323,9 +362,9 @@ export const joinViaInvite = async (req, res) => {
 
     const project = await ProjectModel.findById(invite.project._id);
 
-    // Check if user is already a member
+    // Check if user is already a member - FIXED: check member.user
     const isAlreadyMember = project.team.some(
-      (member) => member.toString() === user._id.toString()
+      (member) => member.user && member.user.toString() === user._id.toString()
     );
 
     if (isAlreadyMember) {
@@ -333,8 +372,25 @@ export const joinViaInvite = async (req, res) => {
     }
 
     // Add user to team
-    project.team.push(user._id);
+    project.team.push({
+      user: user._id,
+      role: invite.role || "viewer"
+    });
     await project.save();
+
+    // Get the project owner
+    const projectOwner = await Signup.findById(project.owner);
+    
+    // Create connection between the owner and the new member
+    const participants = [projectOwner._id, user._id].sort();
+    await Connection.findOneAndUpdate(
+      { participants },
+      { 
+        $set: { lastCollaboratedAt: new Date() },
+        $inc: { commonProjectsCount: 1 } 
+      },
+      { upsert: true }
+    );
 
     // Increment invite usage
     invite.usedCount += 1;
@@ -350,7 +406,7 @@ export const joinViaInvite = async (req, res) => {
     });
   } catch (error) {
     console.error("Join via invite error:", error);
-    return res.status(500).json({ message: "Server Error",error: error.message });
+    return res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -398,7 +454,7 @@ export const getProjectTeam = async (req, res) => {
 
     const project = await ProjectModel.findById(projectId)
       .populate("owner", "username email profile")
-      .populate("team", "username email profile");
+      .populate("team.user", "username email profile");
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
