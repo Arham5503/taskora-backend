@@ -4,30 +4,29 @@ import Signup from "../models/Signup.model.js";
 import jwt from "jsonwebtoken";
 import Connection from "../models/UserProjectConnection.model.js"
 
+
 // Create New Project
 export const createProject = async (req, res) => {
   const token = req.cookies?.accessToken;
-  if (!token) {
-    return res.status(401).json("Session Out");
-  }
-  const { title, priority, durationDays, description, client,team } = req.body;
+  if (!token) return res.status(401).json("Session Out");
+
+  const { title, priority, durationDays, description, client, team } = req.body;
   if (!title || !priority || !durationDays || !description) {
-    return res.status(400).json({
-      message: "All fields are required",
-      title,
-      priority,
-      durationDays,
-    });
+    return res.status(400).json({ message: "All fields are required" });
   }
 
   const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
   const user = await Signup.findOne({ email: decoded.email });
 
   try {
-    const projectTeam=team.map((member)=>({
-      user: member._id,
-      role: member.permission 
-    }))
+    const projectTeam = [
+      { user: user._id, role: "owner" },
+      ...team.map((member) => ({
+        user: member.user._id,
+        role: member.permission,
+      })),
+    ];
+
     const record = new ProjectModel({
       title,
       description,
@@ -38,21 +37,25 @@ export const createProject = async (req, res) => {
       team: projectTeam,
     });
     await record.save();
-   const connectionPromises = team.map(member => {
-      const participants = [user._id, member._id].sort(); 
-      return Connection.findOneAndUpdate(
-        { participants },
-        { 
-          $set: { lastCollaboratedAt: new Date() },
-          $inc: { commonProjectsCount: 1 } 
-        },
-        { upsert: true }
-      );
-    });
-    await Promise.all(connectionPromises);
+
+    if (team.length > 0) {
+      const connectionPromises = team.map((member) => {
+        const participants = [user._id.toString(), member.user._id.toString()].sort();
+        return Connection.findOneAndUpdate(
+          { participants },
+          {
+            $set: { lastCollaboratedAt: new Date() },
+            $inc: { commonProjectsCount: 1 },
+          },
+          { upsert: true }
+        );
+      });
+      await Promise.all(connectionPromises);
+    }
+
     return res.status(200).json({ message: "Project Created Successfully", project: record });
   } catch (error) {
-    return res.status(500).json({ message: "Server Error" ,error: error.message });
+    return res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -137,7 +140,7 @@ export const getProjectById = async (req, res) => {
     // Check if user has access
     const isOwner = project.owner._id.toString() === user._id.toString();
     const isTeamMember = project.team.some(
-      (member) => member._id.toString() === user._id.toString()
+      (member) => member.user._id.toString() === user._id.toString()
     );
 
     if (!isOwner && !isTeamMember) {
@@ -463,7 +466,7 @@ export const getProjectTeam = async (req, res) => {
     // Check if user has access
     const isOwner = project.owner._id.toString() === user._id.toString();
     const isTeamMember = project.team.some(
-      (member) => member._id.toString() === user._id.toString()
+      (member) => member.user._id.toString() === user._id.toString()
     );
 
     if (!isOwner && !isTeamMember) {

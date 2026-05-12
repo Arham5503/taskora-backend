@@ -85,7 +85,7 @@ export const getTasksByProject = async (req, res) => {
 
     const isOwner = project.owner.toString() === userId.toString();
     const isTeamMember = project.team.some(
-      (member) => member.toString() === userId.toString()
+      (member) => member.user._id.toString() === userId.toString()
     );
 
     if (!isOwner && !isTeamMember) {
