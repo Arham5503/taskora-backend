@@ -22,7 +22,7 @@ export const createProject = async (req, res) => {
     const projectTeam = [
       { user: user._id, role: "owner" },
       ...team.map((member) => ({
-        user: member.user._id,
+        user: member._id,
         role: member.permission,
       })),
     ];
@@ -40,7 +40,7 @@ export const createProject = async (req, res) => {
 
     if (team.length > 0) {
       const connectionPromises = team.map((member) => {
-        const participants = [user._id.toString(), member.user._id.toString()].sort();
+        const participants = [user._id.toString(), member._id.toString()].sort();
         return Connection.findOneAndUpdate(
           { participants },
           {

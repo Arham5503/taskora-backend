@@ -19,11 +19,8 @@ const projectInviteSchema = new mongoose.Schema(
       ref: "Signup",
       required: true,
     },
-    role: {
-      type: String,
-      enum: ["viewer", "editor", "admin"],
-      default: "editor",
-    },
+   
+    role: { type: String, enum: ["owner","manager","contributor","viewer" ], default: "viewer" },
     expiresAt: {
       type: Date,
       default: () => new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
