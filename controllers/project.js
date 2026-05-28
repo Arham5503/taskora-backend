@@ -3,6 +3,7 @@ import ProjectInvite from "../models/ProjectInvite.model.js";
 import Signup from "../models/Signup.model.js";
 import jwt from "jsonwebtoken";
 import Connection from "../models/UserProjectConnection.model.js"
+import { createNotification, createNotifications } from "./notifications.js";
 
 
 // Create New Project
@@ -37,6 +38,18 @@ export const createProject = async (req, res) => {
       team: projectTeam,
     });
     await record.save();
+
+    await createNotifications(
+      team.map((member) => ({
+        recipient: member._id,
+        actor: user._id,
+        type: "project",
+        title: "Added to project",
+        description: `${user.username} added you to the project '${record.title}'`,
+        project: record._id,
+        metadata: { action: "project_member_added", role: member.permission },
+      })),
+    );
 
     if (team.length > 0) {
       const connectionPromises = team.map((member) => {
@@ -236,8 +249,28 @@ export const updateProjectStatus = async (req, res) => {
       return res.status(403).json({ message: "Only project owner can update status" });
     }
 
+    const previousStatus = project.status;
     project.status = status;
     await project.save();
+
+    if (previousStatus !== status) {
+      const recipients = project.team.map((member) => member.user);
+      await createNotifications(
+        recipients.map((recipient) => ({
+          recipient,
+          actor: user._id,
+          type: "project",
+          title: "Project status updated",
+          description: `The project '${project.title}' status changed to '${status.replace("_", " ")}'`,
+          project: project._id,
+          metadata: {
+            action: "project_status_updated",
+            status,
+            previousStatus,
+          },
+        })),
+      );
+    }
 
     return res.status(200).json({
       message: "Project status updated",
@@ -399,6 +432,16 @@ export const joinViaInvite = async (req, res) => {
     invite.usedCount += 1;
     await invite.save();
 
+    await createNotification({
+      recipient: project.owner,
+      actor: user._id,
+      type: "project",
+      title: "New project member",
+      description: `${user.username} joined the project '${project.title}'`,
+      project: project._id,
+      metadata: { action: "project_member_joined", role: invite.role },
+    });
+
     return res.status(200).json({
       message: "Successfully joined the project",
       project: {
@@ -513,11 +556,31 @@ export const removeTeamMember = async (req, res) => {
       return res.status(400).json({ message: "Cannot remove project owner" });
     }
 
+    const memberToRemove = project.team.find(
+      (member) =>
+        member._id.toString() === memberId ||
+        member.user?.toString() === memberId
+    );
+
+    if (!memberToRemove) {
+      return res.status(404).json({ message: "Team member not found" });
+    }
+
     // Remove member from team
     project.team = project.team.filter(
-      (member) => member.toString() !== memberId
+      (member) => member._id.toString() !== memberToRemove._id.toString()
     );
     await project.save();
+
+    await createNotification({
+      recipient: memberToRemove.user,
+      actor: user._id,
+      type: "project",
+      title: "Removed from project",
+      description: `${user.username} removed you from the project '${project.title}'`,
+      project: project._id,
+      metadata: { action: "project_member_removed" },
+    });
 
     return res.status(200).json({ message: "Team member removed" });
   } catch (error) {

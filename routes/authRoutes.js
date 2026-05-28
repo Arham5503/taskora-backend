@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { signup, signin, refresh, me, logout, updateProfile, resendOTP, verifyOTP } from "../controllers/authController.js";
 import { creatBlog, fetchBlog } from "../controllers/blog.js";
 import {
@@ -24,8 +25,16 @@ import {
   deleteTask,
   updateTaskStatus,
 } from "../controllers/tasks.js";
+import {
+  deleteNotification,
+  getNotifications,
+  getUnreadNotificationCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "../controllers/notifications.js";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Auth Routes
 router.post("/signup", signup);
@@ -60,12 +69,19 @@ router.get("/invite/:inviteCode", getInviteInfo);
 router.post("/invite/:inviteCode/join", joinViaInvite);
 
 // Task Routes
-router.post("/task", createTask);
+router.post("/task", upload.array("attachments"), createTask);
 router.get("/tasks", getMyTasks);
 router.get("/project/:projectId/tasks", getTasksByProject);
 router.get("/task/:taskId", getTaskById);
 router.put("/task/:taskId", updateTask);
 router.patch("/task/:taskId/status", updateTaskStatus);
 router.delete("/task/:taskId", deleteTask);
+
+// Notification Routes
+router.get("/notifications", getNotifications);
+router.get("/notifications/unread-count", getUnreadNotificationCount);
+router.patch("/notifications/read-all", markAllNotificationsRead);
+router.patch("/notifications/:notificationId/read", markNotificationRead);
+router.delete("/notifications/:notificationId", deleteNotification);
 
 export default router;

@@ -2,13 +2,29 @@ import jwt from "jsonwebtoken";
 import Task from "../models/Task.model.js";
 import Project from "../models/Project.model.js";
 import Signup from "../models/Signup.model.js";
+import { createNotification, createNotifications } from "./notifications.js";
+
+const isProjectTeamMember = (project, userId) =>
+  project.team.some((member) => {
+    const memberUser = member.user?._id || member.user;
+    return memberUser?.toString() === userId.toString();
+  });
 
 // Create a new task
 export const createTask = async (req, res) => {
-  const { title, description, priority, dueDate, project, assignees, category } = req.body;
+  const { title, description, priority, dueDate, project, category } = req.body || {};
+  let { assignees } = req.body || {};
 
   if (!title || !project) {
     return res.status(400).json({ message: "Title and project are required" });
+  }
+
+  if (typeof assignees === "string") {
+    try {
+      assignees = JSON.parse(assignees);
+    } catch {
+      return res.status(400).json({ message: "Assignees must be a valid JSON array" });
+    }
   }
 
   const token = req.cookies.accessToken;
@@ -29,9 +45,7 @@ export const createTask = async (req, res) => {
 
     // Check if user is owner or team member
     const isOwner = projectDoc.owner.toString() === userId.toString();
-    const isTeamMember = projectDoc.team.some(
-      (member) => member.toString() === userId.toString()
-    );
+    const isTeamMember = isProjectTeamMember(projectDoc, userId);
 
     if (!isOwner && !isTeamMember) {
       return res.status(403).json({ message: "You don't have access to this project" });
@@ -46,9 +60,23 @@ export const createTask = async (req, res) => {
       assignees: assignees || [],
       createdBy: userId,
       category: category || "General",
+      attachments: req.files?.length || 0,
     });
 
     await task.save();
+
+    await createNotifications(
+      (assignees || []).map((assigneeId) => ({
+        recipient: assigneeId,
+        actor: userId,
+        type: "task",
+        title: "Task assigned to you",
+        description: `${user.username} assigned you the task '${task.title}'`,
+        project,
+        task: task._id,
+        metadata: { action: "task_assigned" },
+      })),
+    );
 
     // Populate assignees for response
     await task.populate("assignees", "username email profile");
@@ -84,9 +112,7 @@ export const getTasksByProject = async (req, res) => {
     }
 
     const isOwner = project.owner.toString() === userId.toString();
-    const isTeamMember = project.team.some(
-      (member) => member.user._id.toString() === userId.toString()
-    );
+    const isTeamMember = isProjectTeamMember(project, userId);
 
     if (!isOwner && !isTeamMember) {
       return res.status(403).json({ message: "You don't have access to this project" });
@@ -104,7 +130,7 @@ export const getTasksByProject = async (req, res) => {
   }
 };
 
-// Get all tasks for the logged-in user (across all projects)
+// Get tasks assigned to the logged-in user
 export const getMyTasks = async (req, res) => {
   const token = req.cookies.accessToken;
   if (!token) {
@@ -116,14 +142,7 @@ export const getMyTasks = async (req, res) => {
     const user = await Signup.findOne({ email: decoded.email });
     const userId = user._id;
 
-    // Get all projects where user is owner or team member
-    const projects = await Project.find({
-      $or: [{ owner: userId }, { team: userId }],
-    });
-
-    const projectIds = projects.map((p) => p._id);
-
-    const tasks = await Task.find({ project: { $in: projectIds } })
+    const tasks = await Task.find({ assignees: userId })
       .populate("assignees", "username email profile")
       .populate("createdBy", "username email profile")
       .populate("project", "title")
@@ -162,9 +181,7 @@ export const getTaskById = async (req, res) => {
     // Check access
     const project = task.project;
     const isOwner = project.owner.toString() === userId.toString();
-    const isTeamMember = project.team.some(
-      (member) => member.toString() === userId.toString()
-    );
+    const isTeamMember = isProjectTeamMember(project, userId);
 
     if (!isOwner && !isTeamMember) {
       return res.status(403).json({ message: "You don't have access to this task" });
@@ -201,13 +218,14 @@ export const updateTask = async (req, res) => {
     // Check access
     const project = task.project;
     const isOwner = project.owner.toString() === userId.toString();
-    const isTeamMember = project.team.some(
-      (member) => member.toString() === userId.toString()
-    );
+    const isTeamMember = isProjectTeamMember(project, userId);
 
     if (!isOwner && !isTeamMember) {
       return res.status(403).json({ message: "You don't have access to update this task" });
     }
+
+    const previousStatus = task.status;
+    const previousAssigneeIds = task.assignees.map((id) => id.toString());
 
     // Update allowed fields
     const allowedUpdates = [
@@ -230,6 +248,46 @@ export const updateTask = async (req, res) => {
     });
 
     await task.save();
+
+    if (Array.isArray(updates.assignees)) {
+      const newAssigneeIds = updates.assignees
+        .map((id) => id.toString())
+        .filter((id) => !previousAssigneeIds.includes(id));
+
+      await createNotifications(
+        newAssigneeIds.map((assigneeId) => ({
+          recipient: assigneeId,
+          actor: userId,
+          type: "task",
+          title: "Task assigned to you",
+          description: `${user.username} assigned you the task '${task.title}'`,
+          project: task.project._id,
+          task: task._id,
+          metadata: { action: "task_assigned" },
+        })),
+      );
+    }
+
+    if (previousStatus !== "done" && task.status === "done") {
+      const recipients = [
+        task.createdBy,
+        ...task.assignees,
+        task.project.owner,
+      ].map((id) => id.toString());
+
+      await createNotifications(
+        [...new Set(recipients)].map((recipientId) => ({
+          recipient: recipientId,
+          actor: userId,
+          type: "task",
+          title: "Task completed",
+          description: `${user.username} marked '${task.title}' as complete`,
+          project: task.project._id,
+          task: task._id,
+          metadata: { action: "task_completed" },
+        })),
+      );
+    }
 
     await task.populate("assignees", "username email profile");
     await task.populate("createdBy", "username email profile");
@@ -310,16 +368,47 @@ export const updateTaskStatus = async (req, res) => {
     // Check access
     const project = task.project;
     const isOwner = project.owner.toString() === userId.toString();
-    const isTeamMember = project.team.some(
-      (member) => member.toString() === userId.toString()
-    );
+    const isTeamMember = isProjectTeamMember(project, userId);
 
     if (!isOwner && !isTeamMember) {
       return res.status(403).json({ message: "You don't have access to update this task" });
     }
 
+    const previousStatus = task.status;
     task.status = status;
     await task.save();
+
+    if (previousStatus !== "done" && status === "done") {
+      const recipients = [
+        task.createdBy,
+        ...task.assignees,
+        project.owner,
+      ].map((id) => id.toString());
+
+      await createNotifications(
+        [...new Set(recipients)].map((recipientId) => ({
+          recipient: recipientId,
+          actor: userId,
+          type: "task",
+          title: "Task completed",
+          description: `${user.username} marked '${task.title}' as complete`,
+          project: project._id,
+          task: task._id,
+          metadata: { action: "task_completed" },
+        })),
+      );
+    } else if (previousStatus !== status) {
+      await createNotification({
+        recipient: task.createdBy,
+        actor: userId,
+        type: "task",
+        title: "Task status updated",
+        description: `${user.username} moved '${task.title}' to ${status.replace("_", " ")}`,
+        project: project._id,
+        task: task._id,
+        metadata: { action: "task_status_updated", status },
+      });
+    }
 
     return res.status(200).json({
       message: "Task status updated",
